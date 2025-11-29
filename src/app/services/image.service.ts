@@ -1,31 +1,3 @@
-// ...existing code...
-
-@Injectable()
-export class ImageService {
-  // ...existing code...
-
-  /**
-   * Move an image to a new showcase, removing it from all others and persisting the change.
-   */
-  public async moveImageToShowcase(imageId: string, showcaseId: string) {
-    // Remove image from all showcases
-    const showcases = this.showcases$.value;
-    for (const s of showcases) {
-      if (s.images) {
-        s.images = s.images.filter((img: any) => img.id !== imageId);
-        await this.db.put('showcases', { id: s.id, title: s.title, images: s.images.map((img: any) => img.id) });
-      }
-    }
-    // Add image to target showcase
-    const target = showcases.find(s => s.id === showcaseId);
-    if (target) {
-      target.images = target.images || [];
-      target.images.unshift({ id: imageId });
-      await this.db.put('showcases', { id: target.id, title: target.title, images: target.images.map((img: any) => img.id) });
-    }
-    this.showcases$.next(showcases);
-    await this._loadFromDbToMemory();
-  }
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
@@ -123,6 +95,34 @@ export class ImageService {
         this.avatar$.next({ id: avatarItem.id, src: url });
       }
     } catch (err) { console.warn('[ImageService] avatar read failed', err); }
+  }
+    public async moveImageToShowcase(imageId: string, showcaseId: string) {
+    // Remove image from all showcases and delete any that become empty
+    const showcasesDb = await this.db.getAll('showcases');
+    let targetShowcaseObj = null;
+    for (const s of showcasesDb) {
+      if (s.images && s.images.includes(imageId)) {
+        s.images = s.images.filter((id: string) => id !== imageId);
+        if (s.images.length === 0) {
+          await this.db.delete('showcases', s.id);
+        } else {
+          await this.db.put('showcases', s);
+        }
+      }
+      if (s.id === showcaseId) {
+        targetShowcaseObj = s;
+      }
+    }
+    // Add image to target showcase
+    if (targetShowcaseObj) {
+      targetShowcaseObj.images = targetShowcaseObj.images || [];
+      if (!targetShowcaseObj.images.includes(imageId)) {
+        targetShowcaseObj.images.unshift(imageId);
+        await this.db.put('showcases', targetShowcaseObj);
+      }
+    }
+    // Reload in-memory state from DB
+    await this._loadFromDbToMemory();
   }
 
   private async openDb() {
