@@ -99,28 +99,15 @@ export class ImageModalComponent implements AfterViewInit {
       const newId = await this.service.createShowcase(this.newShowcaseName);
       if (newId) targetShowcase = newId;
     }
-    // Remove image from all showcases and persist
-    for (const s of this.showcases) {
-      if (s.images) {
-        s.images = s.images.filter((img: any) => img.id !== id);
-        // Persist showcase update
-        await this.service.db.put('showcases', { id: s.id, title: s.title, images: s.images.map((img: any) => img.id) });
+      // Move image to the selected showcase using the service method
+      await this.service.moveImageToShowcase(id, targetShowcase!);
+      // Update metadata
+      const ok = await this.service.updateImageMetadata(id, this.title, this.description);
+      if (ok) {
+        this.snackBar.open('Image updated', 'OK', { duration: 2000 });
+        this.dialogRef.close({ updated: true, id });
+      } else {
+        this.snackBar.open('Failed to update image', 'OK', { duration: 2000 });
       }
-    }
-    // Add image to target showcase and persist
-    const target = this.showcases.find(s => s.id === targetShowcase);
-    if (target) {
-      target.images = target.images || [];
-      target.images.unshift({ id });
-      await this.service.db.put('showcases', { id: target.id, title: target.title, images: target.images.map((img: any) => img.id) });
-    }
-    // Update metadata
-    const ok = await this.service.updateImageMetadata(id, this.title, this.description);
-    if (ok) {
-      this.snackBar.open('Image updated', 'OK', { duration: 2000 });
-      this.dialogRef.close({ updated: true, id });
-    } else {
-      this.snackBar.open('Failed to update image', 'OK', { duration: 2000 });
-    }
   }
 }

@@ -34,5 +34,8 @@
       }
     }
   },
-  "defaultProject": "mebloggy"
+  "defaultProject": "mebloggy",
+  "cli": {
+    "analytics": false
+  }
 }
