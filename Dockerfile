@@ -7,12 +7,11 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
-RUN npm run build -- --output-path=dist
+RUN npm run build
 
 # Use official Nginx image for serving static files
 FROM nginx:alpine
 
-COPY --from=build /app/dist/MeBloggy /usr/share/nginx/html
+COPY --from=build /app/dist/mebloggy /usr/share/nginx/html
 
-EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
