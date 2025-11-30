@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 
 interface ImageObj { id: string; title: string; description?: string; filename?: string; src?: string; assetSrc?: string; blobSrc?: string }
-interface ShowcaseObj { id: string; title: string; images?: ImageObj[]; visible?: boolean }
+interface ShowcaseObj { id: string; title: string; images?: ImageObj[]; visible?: boolean; order?: number }
 
 interface MeBloggyDB extends DBSchema {
   images: {
@@ -13,7 +13,7 @@ interface MeBloggyDB extends DBSchema {
   }
   showcases: {
     key: string;
-    value: { id: string; title: string; images: string[]; visible?: boolean }
+    value: { id: string; title: string; images: string[]; visible?: boolean; order?: number }
   }
   avatars: {
     key: string;
@@ -25,6 +25,9 @@ interface MeBloggyDB extends DBSchema {
 
 @Injectable()
 export class ImageService {
+    /**
+     * Update the order of showcases and persist to DB
+     */
   
     public showcaseVisibility$ = new BehaviorSubject<{[id: string]: boolean}>({});
 
@@ -74,10 +77,20 @@ export class ImageService {
 
   async init() {
     await this.openDb();
-
-      // Check DB for existing stores to determine whether to seed from assets or load from DB
-      const dbImages = await this.db.getAll('images');
-      const dbShowcases = await this.db.getAll('showcases');
+    // Check DB for existing stores to determine whether to seed from assets or load from DB
+    const dbImages = await this.db.getAll('images');
+    let dbShowcases = await this.db.getAll('showcases');
+    // If any showcase is missing 'order', assign and persist
+    let orderChanged = false;
+    dbShowcases.forEach((s, idx) => {
+      if (typeof s.order !== 'number') {
+        s.order = idx;
+        orderChanged = true;
+      }
+    });
+    if (orderChanged) {
+      for (const s of dbShowcases) await this.db.put('showcases', s);
+    }
       console.log('[ImageService] DB images:', dbImages.length, 'DB showcases:', dbShowcases.length);
 
       if (dbImages.length === 0 && dbShowcases.length === 0) {
@@ -161,6 +174,22 @@ export class ImageService {
     await this._loadFromDbToMemory();
   }
 
+  /**
+   * Update the order of showcases and persist to DB
+   */
+  public async updateShowcaseOrder(newOrderIds: string[]) {
+    if (!this.db) await this.openDb();
+    const showcasesDb = await this.db.getAll('showcases');
+    for (let i = 0; i < newOrderIds.length; i++) {
+      const s = showcasesDb.find((sc: any) => sc.id === newOrderIds[i]);
+      if (s) {
+        s.order = i;
+        await this.db.put('showcases', s);
+      }
+    }
+    await this._loadFromDbToMemory();
+  }
+
   private async openDb() {
     // bump DB version to 3 to allow upgrades that add new fields (visible)
     this.db = await openDB<MeBloggyDB>('mebloggy-db', 3, {
@@ -204,8 +233,8 @@ export class ImageService {
     try {
       showcasesDb = await this.db.getAll('showcases');
     } catch (err) { console.warn('[ImageService] error reading showcases store', err); }
-    console.log('[ImageService] Loading from DB: images', imagesDb.length, 'showcases', showcasesDb.length, 'images sample', imagesDb[0] && { id: imagesDb[0].id, filename: imagesDb[0].filename });
-
+    // Sort showcases by 'order' field
+    showcasesDb.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     // Build an image map for quick lookup
     const imgMap = new Map<string, ImageObj>();
     for (const it of imagesDb) {
@@ -222,7 +251,6 @@ export class ImageService {
       if (this.useBlobUrls && it.blob) img.src = img.blobSrc as string;
       imgMap.set(it.id, img);
     }
-
     const showcases: ShowcaseObj[] = [];
     const visMap: {[id: string]: boolean} = {};
     for (const s of showcasesDb) {
@@ -233,11 +261,14 @@ export class ImageService {
         s.visible = true;
         await this.db.put('showcases', s);
       }
-      showcases.push({ id: s.id, title: s.title, images, visible });
+      showcases.push({ id: s.id, title: s.title, images, visible, order: s.order });
       visMap[s.id] = visible;
     }
-
     this.showcases$.next(showcases);
+  // ...existing code...
+      /**
+       * Update the order of showcases and persist to DB
+       */
     this.showcaseVisibility$.next(visMap);
 
     // set a default featured if none
