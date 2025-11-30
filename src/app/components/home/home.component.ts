@@ -18,11 +18,12 @@ export class HomeComponent implements OnInit, AfterViewInit {
 
   constructor(public imageService: ImageService, private dialog: MatDialog, private router: Router) { }
 
-  ngOnInit(): void {
+  async ngOnInit() {
     // Subscribe to showcases updates
     this.imageService.showcases$.subscribe(v => {
       this.allShowcases = v || [];
-      this.filterShowcases();
+      // Always sort by 'order' property
+      this.showcases = this.allShowcases.slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     });
 
     // Subscribe to showcase visibility
@@ -74,9 +75,11 @@ export class HomeComponent implements OnInit, AfterViewInit {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
-    onShowcaseDrop(event: CdkDragDrop<any[]>) {
+  async onShowcaseDrop(event: CdkDragDrop<any[]>) {
     moveItemInArray(this.showcases, event.previousIndex, event.currentIndex);
-    // Persist new order in service
-    this.imageService.showcases$.next([...this.showcases]);
+    // Persist new order in IndexedDB using service method
+    const newOrderIds = this.showcases.map(s => s.id);
+    await this.imageService.updateShowcaseOrder(newOrderIds);
+    // Do not manually update observable; let service reload handle it
   }
 }
