@@ -23,7 +23,22 @@ interface MeBloggyDB extends DBSchema {
 
 @Injectable()
 export class ImageService {
-  public selectedShowcaseIds$ = new BehaviorSubject<string[]>([]);
+  
+    public showcaseVisibility$ = new BehaviorSubject<{[id: string]: boolean}>(ImageService.loadShowcaseVisibility());
+
+    private static loadShowcaseVisibility(): {[id: string]: boolean} {
+      try {
+        const raw = localStorage.getItem('mebloggy.showcaseVisibility');
+        if (raw) return JSON.parse(raw);
+      } catch {}
+      return {};
+    }
+
+    private saveShowcaseVisibility(vis: {[id: string]: boolean}) {
+      try {
+        localStorage.setItem('mebloggy.showcaseVisibility', JSON.stringify(vis));
+      } catch {}
+    }
   // ...existing code...
   /**
    * Update the order of images in a showcase and persist to DB
@@ -208,6 +223,13 @@ export class ImageService {
     }
 
     this.showcases$.next(showcases);
+
+    // Initialize showcaseVisibility$ if empty
+    if (Object.keys(this.showcaseVisibility$.value).length === 0 && showcases.length > 0) {
+      const vis: {[id: string]: boolean} = {};
+      showcases.forEach(s => { vis[s.id] = true; });
+      this.showcaseVisibility$.next(vis);
+    }
 
     // set a default featured if none
     if (!this.featured$.value && showcases.length > 0) {
