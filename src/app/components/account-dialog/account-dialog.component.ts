@@ -12,7 +12,7 @@ export class AccountDialogComponent implements OnInit, OnDestroy {
   public preview?: string;
   public file?: File;
   public showcases: any[] = [];
-  public selectedShowcaseIds: Set<string> = new Set();
+  public showcaseVisibility: {[id: string]: boolean} = {};
   private _subs: any[] = [];
   public saving = false;
 
@@ -30,22 +30,33 @@ export class AccountDialogComponent implements OnInit, OnDestroy {
     this._subs.push(this.service.avatar$.subscribe(v => {
       if (v && v.src) this.preview = v.src;
     }));
+
+    // subscribe to showcase visibility map
+    this._subs.push(this.service.showcaseVisibility$.subscribe(vis => {
+      this.showcaseVisibility = { ...vis };
+    }));
+
     // subscribe to showcases updates
     this._subs.push(this.service.showcases$.subscribe(showcases => {
       this.showcases = showcases || [];
-      // If selectedShowcaseIds is empty, select all by default
-      if (this.selectedShowcaseIds.size === 0 && this.showcases.length) {
-        this.showcases.forEach(s => this.selectedShowcaseIds.add(s.id));
-      } else {
-        // Remove deselected showcases that no longer exist
-        const validIds = new Set(this.showcases.map(s => s.id));
-        this.selectedShowcaseIds.forEach(id => {
-          if (!validIds.has(id)) this.selectedShowcaseIds.delete(id);
-        });
-        // Add new showcases as selected
-        this.showcases.forEach(s => {
-          if (!this.selectedShowcaseIds.has(s.id)) this.selectedShowcaseIds.add(s.id);
-        });
+      let changed = false;
+      // Add new showcases to visibility map as true
+      const vis = { ...this.showcaseVisibility };
+      this.showcases.forEach(s => {
+        if (!(s.id in vis)) {
+          vis[s.id] = true;
+          changed = true;
+        }
+      });
+      // Remove deleted showcases from visibility map
+      Object.keys(vis).forEach(id => {
+        if (!this.showcases.find(s => s.id === id)) {
+          delete vis[id];
+          changed = true;
+        }
+      });
+      if (changed) {
+        this.service.showcaseVisibility$.next(vis);
       }
     }));
   }
@@ -80,16 +91,9 @@ export class AccountDialogComponent implements OnInit, OnDestroy {
     this.saving = false;
   }
 
-  toggleShowcaseSelection(id: string) {
-    if (this.selectedShowcaseIds.has(id)) {
-      this.selectedShowcaseIds.delete(id);
-    } else {
-      this.selectedShowcaseIds.add(id);
-    }
-    // Optionally, emit an event or update a service to sync with home page
-    if (this.service.selectedShowcaseIds$) {
-      this.service.selectedShowcaseIds$.next(Array.from(this.selectedShowcaseIds));
-    }
+  toggleShowcaseVisibility(id: string) {
+    const newVisible = !this.showcaseVisibility[id];
+    this.service.setShowcaseVisibility(id, newVisible);
   }
 
   close() { this.dialogRef.close(false); }

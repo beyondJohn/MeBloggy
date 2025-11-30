@@ -3,10 +3,10 @@
       <h3 style="margin-top:24px;">Showcase Visibility</h3>
   <div *ngIf="showcases?.length; else noShowcases" class="showcase-list">
     <div *ngFor="let showcase of showcases"
-         (click)="toggleShowcaseSelection(showcase.id)"
+         (click)="toggleShowcaseVisibility(showcase.id)"
          [class.showcase-title]="true"
-         [class.active]="selectedShowcaseIds.has(showcase.id)"
-         [class.inactive]="!selectedShowcaseIds.has(showcase.id)">
+         [class.active]="showcaseVisibility[showcase.id]"
+         [class.inactive]="!showcaseVisibility[showcase.id]">
       {{ showcase.title }}
     </div>
   </div>

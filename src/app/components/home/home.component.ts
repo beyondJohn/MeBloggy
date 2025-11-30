@@ -14,6 +14,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
   featuredImage: any = null;
   showcases: any[] = [];
   private allShowcases: any[] = [];
+  private showcaseVisibility: {[id: string]: boolean} = {};
 
   constructor(public imageService: ImageService, private dialog: MatDialog, private router: Router) { }
 
@@ -24,8 +25,9 @@ export class HomeComponent implements OnInit, AfterViewInit {
       this.filterShowcases();
     });
 
-    // Subscribe to selected showcase IDs
-    this.imageService.selectedShowcaseIds$.subscribe(ids => {
+    // Subscribe to showcase visibility
+    this.imageService.showcaseVisibility$.subscribe(vis => {
+      this.showcaseVisibility = { ...vis };
       this.filterShowcases();
     });
 
@@ -33,12 +35,7 @@ export class HomeComponent implements OnInit, AfterViewInit {
   }
 
   filterShowcases() {
-    const selectedIds = this.imageService.selectedShowcaseIds$.value;
-    if (!selectedIds.length) {
-      this.showcases = this.allShowcases;
-    } else {
-      this.showcases = this.allShowcases.filter(s => selectedIds.includes(s.id));
-    }
+    this.showcases = this.allShowcases.filter(s => this.showcaseVisibility[s.id]);
     // Optionally, update featured image if needed
     if (this.showcases.length) {
       const firstShowcase = this.showcases[0];
